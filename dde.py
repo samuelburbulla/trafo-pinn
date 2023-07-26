@@ -22,4 +22,4 @@ dde.optimizers.config.set_LBFGS_options(maxiter=3000)
 model.compile("L-BFGS")
 model.train()
 
-plot(net)
+plot(net, "dde")
