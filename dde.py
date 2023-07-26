@@ -15,7 +15,7 @@ geom = dde.geometry.Rectangle([0, 0], [1, 1])
 bc = dde.icbc.DirichletBC(geom, lambda x: x[:, 0] * (1 - x[:, 0]) - x[:, 1] * (1 - x[:, 1]), boundary)
 
 data = dde.data.PDE(geom, pde, bc, num_domain=20**2, num_boundary=4*20, num_test=50**2)
-net = dde.nn.FNN([2] + [128] * 10 + [1], "tanh", "Glorot uniform")
+net = dde.nn.FNN([2] + [32] * 3 + [1], "tanh", "Glorot uniform")
 model = dde.Model(data, net)
 
 dde.optimizers.config.set_LBFGS_options(maxiter=3000)

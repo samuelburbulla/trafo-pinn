@@ -20,5 +20,5 @@ def plot(model: torch.nn.Module, name: Optional[str] = None):
     with torch.no_grad():
         ax.plot_surface(X, Y, Z, cmap="viridis")
     if name is not None:
-        plt.savefig(name)
+        plt.savefig(f"plots/{name}")
     plt.show()
