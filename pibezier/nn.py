@@ -2,14 +2,13 @@ import torch
 from deepxde.nn.pytorch import NN
 from deepxde import config
 from deepxde.nn import initializers
-from deepxde.icbc.boundary_conditions import DirichletBC
 from scipy.special import comb as scipy_comb
 from typing import Any
 
 class BNN(NN):
     """Bezier neural network."""
 
-    def __init__(self, dim: int, control_points: int, bc: Any = None):
+    def __init__(self, dim: int, control_points: int, bc: Any = None, transformation: Any = None):
         """Initialize the Bezier neural network.
         
         Args:
@@ -22,6 +21,7 @@ class BNN(NN):
         self.dim = dim
         self.control_points = control_points
         self.bc = bc
+        self.transformation = transformation
 
         if self.bc is not None:
             num_parameters = control_points - 2
@@ -44,7 +44,26 @@ class BNN(NN):
             dtype=config.real(torch)
         )
 
+        # Initialize the boundary condition
+        if self.bc is not None:
+            x = torch.linspace(0, 1, n)
+            meshgrid = torch.meshgrid(x, x, indexing="ij")
+            control_points = torch.stack(meshgrid).reshape(2, -1).transpose(0, 1)
+
+            # Transform control points to the global domain
+            if self.transformation is not None:
+                control_points = self.transformation.global_(control_points)
+
+            # Evaluate the boundary condition
+            self.bc_coefficients = self.bc(control_points).reshape(n, n)
+
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+
+        # Transform the input to the reference domain
+        if self.transformation is not None:
+            x = self.transformation.local_(x)
+
         num_points, dim = x.shape
         assert dim == 2
         n = self.control_points
@@ -69,13 +88,8 @@ class BNN(NN):
         if self.bc is None:
             coefficients = self.coefficients.weight
         else:
-            # Get control points
-            x = torch.linspace(0, 1, n)
-            meshgrid = torch.meshgrid(x, x, indexing="ij")
-            control_points = torch.stack(meshgrid).reshape(2, -1).T
-
-            # Evaluate the boundary condition
-            coefficients = self.bc(control_points).reshape(n, n)
+            # Initialize the coefficients with the boundary condition
+            coefficients = self.bc_coefficients.clone()
 
             # Set the inner control points' parameters
             coefficients[1:-1, 1:-1] = self.coefficients.weight.view(n-2, n-2)

@@ -1,25 +1,28 @@
+from numpy import sin, pi
+import pibezier as pib
 import deepxde as dde
-from src.plot import plot
+from deepxde.optimizers.config import set_LBFGS_options
+
+
+geom = dde.geometry.Rectangle([0, 0], [2, 1])
 
 def pde(x, y):
     dy_xx = dde.grad.hessian(y, x, i=0, j=0)
     dy_yy = dde.grad.hessian(y, x, i=1, j=1)
-    return -dy_xx - dy_yy
+    return - dy_xx - dy_yy
 
 
-def boundary(_, on_boundary):
-    return on_boundary
+u_D = lambda x: sin(pi * x[:, 0:1]) * (1 - x[:, 1:2])
 
+bc = dde.icbc.DirichletBC(geom, u_D, lambda _, on_boundary: on_boundary)
+data = dde.data.PDE(geom, pde, bc, num_domain=30**2, num_boundary=4*30)
 
-geom = dde.geometry.Rectangle([0, 0], [1, 1])
-bc = dde.icbc.DirichletBC(geom, lambda x: x[:, 0] * (1 - x[:, 0]) - x[:, 1] * (1 - x[:, 1]), boundary)
+net = dde.nn.FNN([2] + [50] * 4 + [1], "tanh", "Glorot uniform")
 
-data = dde.data.PDE(geom, pde, bc, num_domain=20**2, num_boundary=4*20, num_test=50**2)
-net = dde.nn.FNN([2] + [32] * 3 + [1], "tanh", "Glorot uniform")
 model = dde.Model(data, net)
 
-dde.optimizers.config.set_LBFGS_options(maxiter=3000)
+set_LBFGS_options(maxiter=1000)
 model.compile("L-BFGS")
 model.train()
 
-plot(net, "dde")
+pib.plotting.plot(geom, net, u_D, "dde")

@@ -1,24 +1,28 @@
+from torch import sin, pi
+import pibezier as pib
 import deepxde as dde
-from src.bnn import BNN
-from src.plot import plot
+from deepxde.optimizers.config import set_LBFGS_options
 
-def pde(x, y):
-    dy_xx = dde.grad.hessian(y, x, i=0, j=0)
-    dy_yy = dde.grad.hessian(y, x, i=1, j=1)
-    return -dy_xx - dy_yy
 
-def boundary(_, on_boundary):
-    return on_boundary
+geom = pib.geometry.Parallelogram([[2, 0], [0, 1]])
 
-geom = dde.geometry.Rectangle([0, 0], [1, 1])
-bc = lambda x: x[:, 0] * (1 - x[:, 0]) - x[:, 1] * (1 - x[:, 1])
+def pde(x, u):
+    dy_xx = dde.grad.hessian(u, x, i=0, j=0)
+    dy_yy = dde.grad.hessian(u, x, i=1, j=1)
+    return - dy_xx - dy_yy
 
-data = dde.data.PDE(geom, pde, [], num_domain=50**2)
-net = BNN(dim=2, control_points=20, bc=bc)
+
+u_D = lambda x: sin(pi * x[:, 0:1]) * (1 - x[:, 1:2])
+
+bc = u_D
+data = dde.data.PDE(geom, pde, [], num_domain=30**2)
+
+net = pib.nn.BNN(dim=2, control_points=30, bc=bc, transformation=geom)
+
 model = dde.Model(data, net)
 
-dde.optimizers.config.set_LBFGS_options(maxiter=1000)
+set_LBFGS_options(maxiter=1000)
 model.compile("L-BFGS")
 model.train()
 
-plot(net, "bezier")
+pib.plotting.plot(geom, net, u_D, "bezier")
