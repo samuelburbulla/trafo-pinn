@@ -71,14 +71,15 @@ class Parallelogram(TransformedGeometry):
 
         bbox = [self.global_(x) for x in self.ref.bbox]
         diam = np.max([
-            np.linalg.norm(bbox[0] - bbox[1]),        # lower left to upper right
+            np.linalg.norm(bbox[0] - bbox[1]),      # lower left to upper right
             np.linalg.norm(self.A[0] - self.A[1])   # lower right to upper left
         ])
         super().__init__(dim=dim, bbox=bbox, diam=diam)
 
     def global_(self, xs):
         if type(xs) is torch.Tensor:
-            At, b = torch.tensor(self.A, dtype=torch.float32), torch.tensor(self.b, dtype=torch.float32), 
+            At = torch.tensor(self.A, dtype=torch.float32)
+            b = torch.tensor(self.b, dtype=torch.float32)
         else:
             At, b = self.A, self.b
         
@@ -86,8 +87,14 @@ class Parallelogram(TransformedGeometry):
 
     def local_(self, ys):
         if type(ys) is torch.Tensor:
-            Atinv, b = torch.tensor(self.Ainv, dtype=torch.float32), torch.tensor(self.b, dtype=torch.float32), 
+            Atinv = torch.tensor(self.Ainv, dtype=torch.float32)
+            b = torch.tensor(self.b, dtype=torch.float32)
         else:
             Atinv, b = self.Ainv, self.b
 
         return (ys - b) @ Atinv
+    
+    def distance2boundary(self, x, dirn=None):
+        """Return distance to boundary."""
+        x = self.local_(x)
+        return x[:, 0:1] * (1 - x[:, 0:1]) * x[:, 1:2] * (1 - x[:, 1:2])
