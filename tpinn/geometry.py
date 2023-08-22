@@ -1,4 +1,5 @@
 import deepxde as dde
+import torch
 
 
 class Transformed(dde.geometry.Geometry):
@@ -21,11 +22,40 @@ class Transformed(dde.geometry.Geometry):
     to_local: callable
 
     def __init__(self, ref, to_global, to_local):
-       self.ref = ref
-       self.to_global = to_global
-       self.to_local = to_local
+        self.ref = ref
+        self.to_global_ = to_global
+        self.to_local_ = to_local
+
+        x = self.ref.uniform_points(10)
+        assert (self.to_local(self.to_global(x)) - x < 1e-6).all()
        
-       super().__init__(ref.dim, ref.bbox, ref.diam)
+        super().__init__(ref.dim, ref.bbox, ref.diam)
+
+    def to_global(self, x):
+        """Transform points from local to global coordinates."""
+        numpy = (type(x) != torch.tensor)
+        if numpy:
+            x = torch.tensor(x)
+
+        y = self.to_global_(x)
+
+        if numpy:
+            y = y.detach().numpy()
+
+        return y
+
+    def to_local(self, y):
+        """Transform points from global to local coordinates."""
+        numpy = (type(y) != torch.Tensor)
+        if numpy:
+            y = torch.tensor(y)
+
+        x = self.to_local_(y)
+
+        if numpy:
+            x = x.detach().numpy()
+
+        return x
 
     def inside(self, x):
         """Return whether the points are inside the geometry."""
@@ -61,7 +91,7 @@ class Transformed(dde.geometry.Geometry):
         # Implement distance2boundary for Rectangle
         if type(self.ref) == dde.geometry.Rectangle:
             x = self.to_local(x)
-            dist = 1
+            dist = 4**self.ref.dim
             for i in range(self.ref.dim):
                 dist *= x[:, i:i+1] * (1 - x[:, i:i+1])
             return dist
