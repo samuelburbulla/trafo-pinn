@@ -1,5 +1,5 @@
 import torch
-torch.manual_seed(1)
+torch.manual_seed(0)
 
 from tpinn.geometry import Transformed
 import deepxde as dde
@@ -31,10 +31,10 @@ model.compile("adam", lr=1e-4)
 
 # Solve with transformation to local coordinates
 net.apply_feature_transform(lambda x: geom.to_local(x))
-model.train(epochs=10000)
+model.train(epochs=15000)
 
 # Plot solution
-x = geom.uniform_points(100)
+x = geom.uniform_points(1000)
 u = net(torch.tensor(x)).detach().numpy()
-plt.plot(x[:, 0], u, '.')
+plt.plot(x[:, 0], u, 'b-')
 plt.savefig("01_eikonal.png")
