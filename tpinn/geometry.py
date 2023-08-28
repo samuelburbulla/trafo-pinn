@@ -21,19 +21,25 @@ class Transformed(dde.geometry.Geometry):
     to_global: callable
     to_local: callable
 
-    def __init__(self, ref, to_global, to_local):
+    def __init__(self, ref, to_global, to_local=None):
         self.ref = ref
         self.to_global_ = to_global
         self.to_local_ = to_local
 
-        x = self.ref.uniform_points(10)
-        assert (self.to_local(self.to_global(x)) - x < 1e-6).all()
-       
-        super().__init__(ref.dim, ref.bbox, ref.diam)
+        x = self.ref.uniform_points(10**self.ref.dim)
+        if to_local is not None:
+            x2 = self.to_local(self.to_global(x))
+            if not (x2 - x < 1e-6).all():
+                print(f"{x2} != {x}")
+                assert False
+
+        bbox = [to_global(torch.tensor(b).unsqueeze(0))[1:] for b in ref.bbox]
+        super().__init__(ref.dim, bbox, torch.nan)
+        self.dim = bbox[0].shape[0]
 
     def to_global(self, x):
         """Transform points from local to global coordinates."""
-        numpy = (type(x) != torch.tensor)
+        numpy = (type(x) != torch.Tensor)
         if numpy:
             x = torch.tensor(x)
 

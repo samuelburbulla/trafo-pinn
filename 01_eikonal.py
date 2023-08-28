@@ -1,34 +1,37 @@
 import torch
 torch.manual_seed(0)
 
-from tpinn.geometry import Transformed
+import tpinn.geometry
+import tpinn.grad
 import deepxde as dde
 import matplotlib.pyplot as plt
 
-l = 3 / 2 * torch.pi
-ref = dde.geometry.Rectangle([0], [l])
+ref = dde.geometry.Rectangle([0], [1])
+l = 1 / 2 * torch.pi
 
 def to_global(x):
-    return torch.stack([
-        torch.sin(x),
-        torch.cos(x),
-        ]).transpose(0, -1).squeeze(0)
+    return torch.cat((
+        torch.sin(l * x),
+        torch.cos(l * x),
+    ), dim=1)
 
+def to_local(y):
+    return torch.atan2(y[:, 0:1], y[:, 1:2]) / l
+
+
+geom = tpinn.geometry.Transformed(ref, to_global, to_local)
 dim = 2
 
 # Eikonal equation: grad(u) = 1
 def pde(y, u):
-    grad = 0
-    for j in range(ref.dim):
-        grad += dde.grad.jacobian(u, y, i=0, j=j)
+    grad = tpinn.grad.jacobian(u, y, geom)
     return (grad - 1)**2
 
-data = dde.data.PDE(ref, pde, [], num_domain=100)
+data = dde.data.PDE(geom, pde, [], num_domain=100)
 net = dde.nn.FNN([dim] + [128] * 3 + [1], "tanh", "Glorot uniform")
-net.apply_feature_transform(lambda x: to_global(x))
 
-# Zero Dirichlet boundary condition u(0) = 0
-net.apply_output_transform(lambda x, u: x * u)
+# Zero Dirichlet boundary condition: u(0) = 0
+net.apply_output_transform(lambda x, u: geom.to_local(x) * u)
 
 model = dde.Model(data, net)
 dde.optimizers.config.set_LBFGS_options(maxiter=100)
@@ -36,13 +39,12 @@ model.compile("L-BFGS")
 model.train()
 
 # Evaluate solution
-x = ref.uniform_points(1000)
+x = geom.uniform_points(1000)
 x = torch.tensor(x)
 u = net(x)
 u = u.detach().numpy()
 
 # Plot in global coordinates
-x = to_global(x)
 plt.scatter(x[:, 0], x[:, 1], s=10, c=u)
 plt.colorbar()
 plt.axis('equal')
