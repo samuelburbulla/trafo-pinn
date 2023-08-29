@@ -14,7 +14,10 @@ class Transformed(dde.geometry.Geometry):
     Args:
         ref: The reference geometry.
         to_global: The mapping from local to global coordinates.
-        to_local: The mapping from global to local coordinates.
+        to_local: (optional) The mapping from global to local coordinates.
+            By default, we assume that `to_global` concatenates the local and
+            global coordinates and, therefore, the default `to_local` only 
+            extracts the ref.dim first elements of the global coordinates.
     """
 
     ref: dde.geometry.Geometry
@@ -22,20 +25,25 @@ class Transformed(dde.geometry.Geometry):
     to_local: callable
 
     def __init__(self, ref, to_global, to_local=None):
+        # Default to_local
+        if to_local is None:
+            to_local = lambda y: y[:, :ref.dim]
+
         self.ref = ref
         self.to_global_ = to_global
         self.to_local_ = to_local
 
-        x = self.ref.uniform_points(10**self.ref.dim)
-        if to_local is not None:
-            x2 = self.to_local(self.to_global(x))
-            if not (x2 - x < 1e-6).all():
-                print(f"{x2} != {x}")
-                assert False
+        # Validate transformation
+        x = self.ref.uniform_points(3**self.ref.dim)
+        z = self.to_local(self.to_global(x))
+        if not (z - x < 1e-6).all():
+            print(f"{z.T}\n  != \n{x.T}")
+            raise ValueError("Transformation does not satisfy"\
+                             "`to_local(to_global(x)) = x`!")
 
-        bbox = [to_global(torch.tensor(b).unsqueeze(0))[1:] for b in ref.bbox]
+        bbox = [to_global(torch.tensor(b).unsqueeze(0)) for b in ref.bbox]
         super().__init__(ref.dim, bbox, torch.nan)
-        self.dim = bbox[0].shape[0]
+        self.dim = bbox[0].shape[-1] - ref.dim
 
     def to_global(self, x):
         """Transform points from local to global coordinates."""
