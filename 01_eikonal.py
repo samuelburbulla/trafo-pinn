@@ -1,3 +1,4 @@
+import math
 import torch
 torch.manual_seed(0)
 
@@ -7,13 +8,17 @@ import deepxde as dde
 import matplotlib.pyplot as plt
 
 ref = dde.geometry.Interval(0, 1)
-l = 3 / 2 * torch.pi
+
+# Archimedean spiral
+l = 3.5 * torch.pi
+a = 0.1
+r = lambda x: a * x
 
 def to_global(x):
     return torch.cat((
         x,
-        torch.sin(l * x),
-        torch.cos(l * x),
+        r(l * x) * torch.sin(l * x),
+        r(l * x) * torch.cos(l * x),
     ), dim=1)
 
 
@@ -31,12 +36,12 @@ def pde(y, u):
 def boundary(x, on_boundary):
     return dde.utils.isclose(x[0], 0)
 
-def g(_):
+def zero(_):
     return 0
 
-bc = dde.icbc.DirichletBC(geom, g, boundary)
+bc = dde.icbc.DirichletBC(geom, zero, boundary)
 data = dde.data.PDE(geom, pde, bc, num_domain=100, num_boundary=2)
-net = dde.nn.FNN([dim] + [128] * 3 + [1], "tanh", "Glorot uniform")
+net = dde.nn.FNN([dim] + [128] * 5 + [1], "tanh", "Glorot uniform")
 net.apply_feature_transform(lambda x: x[:, rdim:])
 
 model = dde.Model(data, net)
@@ -58,5 +63,6 @@ plt.savefig("01_eikonal.png")
 
 # Check that the solution is correct
 umax = u.max()
-print(f"u_max: {umax:.3f}  expected: {l:.3f}\n")
-assert abs(umax - l) < 1e-2
+exact = a / 2 * (l * (1 + l**2)**.5 + math.log(l + (1 + l**2)**.5))
+print(f"u_max: {umax:.3f}  exact: {exact:.3f}\n")
+assert abs(umax - exact) < 1e-2
