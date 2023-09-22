@@ -1,4 +1,5 @@
 import deepxde as dde
+import deepxde.backend as bkd
 import torch
 
 
@@ -14,60 +15,43 @@ class Transformed(dde.geometry.Geometry):
     Args:
         ref: The reference geometry.
         to_global: The mapping from local to global coordinates.
-        to_local: (optional) The mapping from global to local coordinates.
-            By default, we assume that `to_global` concatenates the local and
-            global coordinates and, therefore, the default `to_local` only 
-            extracts the ref.dim first elements of the global coordinates.
+        to_local: The mapping from global to local coordinates.
     """
 
     ref: dde.geometry.Geometry
     to_global: callable
     to_local: callable
 
-    def __init__(self, ref, to_global, to_local=None):
-        # Default to_local
-        if to_local is None:
-            to_local = lambda y: y[:, :ref.dim]
-
+    def __init__(self, ref, to_global, to_local):
         self.ref = ref
         self.to_global_ = to_global
         self.to_local_ = to_local
 
-        # Validate transformation
-        x = self.ref.uniform_points(3**self.ref.dim)
-        z = self.to_local(self.to_global(x))
-        if not (z - x < 1e-6).all():
-            print(f"{z.T}\n  != \n{x.T}")
-            raise ValueError("Transformation does not satisfy"\
-                             "`to_local(to_global(x)) = x`!")
-
-        bbox = [to_global(torch.tensor(b).unsqueeze(0)) for b in ref.bbox]
-        super().__init__(ref.dim, bbox, torch.nan)
-        self.dim = bbox[0].shape[-1] - ref.dim
+        super().__init__(ref.dim, ref.bbox, torch.nan) # dummy bbox and diam
 
     def to_global(self, x):
         """Transform points from local to global coordinates."""
-        numpy = (type(x) != torch.Tensor)
-        if numpy:
-            x = torch.tensor(x)
+        tensor = bkd.is_tensor(x)
+        if not tensor:
+            x = bkd.as_tensor(x)
 
         y = self.to_global_(x)
 
-        if numpy:
-            y = y.detach().numpy()
+        if not tensor:
+            y = bkd.to_numpy(y)
 
         return y
 
     def to_local(self, y):
         """Transform points from global to local coordinates."""
-        numpy = (type(y) != torch.Tensor)
-        if numpy:
-            y = torch.tensor(y)
+        tensor = bkd.is_tensor(x)
+        if not tensor:
+            y = bkd.as_tensor(y)
 
         x = self.to_local_(y)
 
-        if numpy:
-            x = x.detach().numpy()
+        if not tensor:
+            y = bkd.to_numpy(y)
 
         return x
 
@@ -99,16 +83,3 @@ class Transformed(dde.geometry.Geometry):
         x = self.ref.uniform_boundary_points(n)
         return self.to_global(x)
     
-    def distance2boundary(self, x, dirn=None):
-        """Return distance to boundary."""
-
-        # Implement distance2boundary for Rectangle
-        if type(self.ref) == dde.geometry.Rectangle:
-            x = self.to_local(x)
-            dist = 4**self.ref.dim
-            for i in range(self.ref.dim):
-                dist *= x[:, i:i+1] * (1 - x[:, i:i+1])
-            return dist
-        
-        else:
-            return self.ref.distance2boundary(self.to_local(x), dirn)

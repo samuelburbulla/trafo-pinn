@@ -1,7 +1,9 @@
+import os
 import torch
-torch.manual_seed(0)
 import deepxde as dde
 import matplotlib.pyplot as plt
+torch.manual_seed(0)
+os.makedirs('shape_plots', exist_ok=True)
 
 dim = 2
 
@@ -102,7 +104,7 @@ for step in range(101):
     plt.axis('equal')
     plt.xlim([-.25, 1.25])
     plt.ylim([-.25, 1.25])
-    plt.savefig(f"plots/defo_{step}.png")
+    plt.savefig(f"shape_plots/shape_{step}.png")
 
     # Early stopping
     if abs(last_loss - loss) < 1e-14:

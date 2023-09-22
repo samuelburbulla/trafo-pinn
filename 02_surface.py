@@ -8,7 +8,7 @@ ref = dde.geometry.Rectangle([0, 0], [1, 1])
 dim = 3
 
 # Spherical coordinates
-phi0, theta0 = 0.25, 1.0
+phi0, theta0 = 0.5, 1.0
 
 def to_global(x):
     phi = x[:, 0:1] + phi0
@@ -19,27 +19,26 @@ def to_global(x):
         torch.cos(phi),
     ), dim=1)
 
-# Poisson equation: -Delta(u) = 1
+# Poisson equation: -Lap(u) = 1
 def pde(x, u):
-    arc_length = torch.sqrt(sum(dde.grad.jacobian(to_global(x), x, i=i)**2 for i in range(dim)))
+    lap = 0
+    for i in range(ref.dim):
+        lap += dde.grad.hessian(u, x, i=i, j=i)
+    return (-lap - 1)**2
 
-    hess = 0
-    for j in range(ref.dim):
-        grad = dde.grad.jacobian(u, x, j=j) / arc_length[:, j:j+1]
-        hess += dde.grad.jacobian(grad, x, j=j) / arc_length[:, j:j+1]
-    return (-hess - 1)**2
+# Dirichlet boundary conditions
+bc = dde.icbc.DirichletBC(ref, lambda _: 0, lambda _, on_boundary: on_boundary)
 
-data = dde.data.PDE(ref, pde, [], num_domain=100)
-net = dde.nn.FNN([dim] + [32] + [1], "tanh", "Glorot uniform")
+data = dde.data.PDE(ref, pde, bc, num_domain=100, num_boundary=40)
+net = dde.nn.FNN([dim] + [32] * 3 + [1], "tanh", "Glorot uniform")
 net.apply_feature_transform(lambda x: to_global(x))
 
 # Zero Dirichlet BC
 q = lambda z: 4 * z * (1 - z)
-net.apply_output_transform(lambda x, u: q(x[:, 0:1]) * q(x[:, 1:2]) * u)
 
 model = dde.Model(data, net)
-dde.optimizers.config.set_LBFGS_options(maxiter=100)
-model.compile("L-BFGS")
+dde.optimizers.config.set_LBFGS_options(maxiter=1)
+model.compile("L-BFGS", loss_weights=[1e-2, 1e2])
 model.train()
 
 # Evaluate solution
