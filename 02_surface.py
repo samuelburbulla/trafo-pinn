@@ -8,15 +8,15 @@ ref = dde.geometry.Rectangle([0, 0], [1, 1])
 dim = 3
 
 # Spherical coordinates
-phi0, theta0 = 0.5, 1.0
+psi0, theta0 = 0.5, 1.0
 
 def to_global(x):
-    phi = x[:, 0:1] + phi0
+    psi = x[:, 0:1] + psi0
     theta = x[:, 1:2] - theta0
     return torch.cat((
-        torch.sin(phi) * torch.cos(theta),
-        torch.sin(phi) * torch.sin(theta),
-        torch.cos(phi),
+        torch.sin(psi) * torch.cos(theta),
+        torch.sin(psi) * torch.sin(theta),
+        torch.cos(psi),
     ), dim=1)
 
 # Poisson equation: -Lap(u) = 1
@@ -26,19 +26,18 @@ def pde(x, u):
         lap += dde.grad.hessian(u, x, i=i, j=i)
     return (-lap - 1)**2
 
-# Dirichlet boundary conditions
-bc = dde.icbc.DirichletBC(ref, lambda _: 0, lambda _, on_boundary: on_boundary)
-
-data = dde.data.PDE(ref, pde, bc, num_domain=100, num_boundary=40)
-net = dde.nn.FNN([dim] + [32] * 3 + [1], "tanh", "Glorot uniform")
+data = dde.data.PDE(ref, pde, [], num_domain=100)
+net = dde.nn.FNN([dim] + [128] * 3 + [1], "tanh", "Glorot uniform")
 net.apply_feature_transform(lambda x: to_global(x))
 
-# Zero Dirichlet BC
-q = lambda z: 4 * z * (1 - z)
+# Exact Dirichlet boundary condition
+q = lambda x: 4 * x * (1 - x)
+b = lambda x: q(x[:, 0:1]) * q(x[:, 1:2])
+net.apply_output_transform(lambda x, u: u * b(x))
 
 model = dde.Model(data, net)
-dde.optimizers.config.set_LBFGS_options(maxiter=1)
-model.compile("L-BFGS", loss_weights=[1e-2, 1e2])
+dde.optimizers.config.set_LBFGS_options(maxiter=1000)
+model.compile("L-BFGS")
 model.train()
 
 # Evaluate solution
