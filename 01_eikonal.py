@@ -27,20 +27,15 @@ def pde(x, u):
     grad = dde.grad.jacobian(u, x) / arc_length
     return (grad - 1)**2
 
-# Zero Dirichlet boundary condition: u(0) = 0
-def boundary(x, _):
-    return dde.utils.isclose(x[0], 0)
-
-def zero(_):
-    return 0
-
-bc = dde.icbc.DirichletBC(ref, zero, boundary)
-data = dde.data.PDE(ref, pde, bc, num_domain=100, num_boundary=2)
+data = dde.data.PDE(ref, pde, [], num_domain=100)
 net = dde.nn.FNN([dim] + [128] * 3 + [1], "tanh", "Glorot uniform")
 net.apply_feature_transform(lambda x: to_global(x))
 
+# Zero Dirichlet boundary condition: u(0) = 0
+net.apply_output_transform(lambda x, u: x[:, 0:1] * u)
+
 model = dde.Model(data, net)
-dde.optimizers.config.set_LBFGS_options(maxiter=100)
+dde.optimizers.config.set_LBFGS_options(maxiter=1000)
 model.compile("L-BFGS")
 model.train()
 
@@ -60,5 +55,6 @@ plt.savefig("01_eikonal.png")
 # Check that solution is correct
 umax = u.max()
 exact = a / 2 * (l * (1 + l**2)**.5 + math.log(l + (1 + l**2)**.5))
-print(f"u_max: {umax:.3f}  exact: {exact:.3f}\n")
+print(f"u_max: {umax:.3f}  exact: {exact:.3f}"
+      f"  error: {abs(umax - exact)/umax*100:.2f}%\n")
 assert abs(umax - exact) < 1e-2
