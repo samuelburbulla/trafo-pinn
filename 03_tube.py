@@ -10,20 +10,20 @@ dim = 2
 ref = dde.geometry.Rectangle([0]*dim, [1]*dim)
 
 # Transform domain along x-axis
-f = lambda x: 1 + 0.05 * bkd.cos(2 * torch.pi * x)
+s = lambda x: .2 + .1 * bkd.cos(3 * torch.pi * x)
 
 def to_global(x):
     x, y = x[..., 0:1], x[..., 1:2]
     return bkd.concat((
         x,
-        y * f(x),
+        (2 * y - 1) * s(x),
     ), 1)
 
 def to_local(x):
     x, y = x[..., 0:1], x[..., 1:2]
     return bkd.concat((
         x,
-        y / f(x),
+        (y / s(x) + 1) / 2,
     ), 1)
 
 geo = geometry.Transformed(ref, to_global, to_local)
@@ -32,27 +32,21 @@ geo = geometry.Transformed(ref, to_global, to_local)
 #   -Delta u + grad p = 0
 #   div u = 0
 def pde(x, sol):
-    arc_lengths = torch.cat([
-        torch.sqrt(sum(dde.grad.jacobian(to_global(x), x, i=i, j=j)**2 for j in range(dim)))
-        for i in range(dim)
-    ], dim=1)
-    lx, ly = arc_lengths[:, 0:1], arc_lengths[:, 1:2]
-    
     u, v, p = sol[:, 0:1], sol[:, 1:2], sol[:, 2:3]
     
-    p_x = dde.grad.jacobian(p, x, j=0) / lx
-    p_y = dde.grad.jacobian(p, x, j=1) / ly
+    p_x = dde.grad.jacobian(p, x, j=0)
+    p_y = dde.grad.jacobian(p, x, j=1)
 
-    u_x = dde.grad.jacobian(u, x, j=0) / lx
-    u_y = dde.grad.jacobian(u, x, j=1) / ly
-    v_x = dde.grad.jacobian(v, x, j=0) / lx
-    v_y = dde.grad.jacobian(v, x, j=1) / ly
+    u_x = dde.grad.jacobian(u, x, j=0)
+    u_y = dde.grad.jacobian(u, x, j=1)
+    v_x = dde.grad.jacobian(v, x, j=0)
+    v_y = dde.grad.jacobian(v, x, j=1)
 
-    u_xx = dde.grad.jacobian(u_x, x, j=0) / lx
-    u_yy = dde.grad.jacobian(u_y, x, j=1) / ly
+    u_xx = dde.grad.jacobian(u_x, x, j=0)
+    u_yy = dde.grad.jacobian(u_y, x, j=1)
 
-    v_xx = dde.grad.jacobian(v_x, x, j=0) / lx
-    v_yy = dde.grad.jacobian(v_y, x, j=1) / ly
+    v_xx = dde.grad.jacobian(v_x, x, j=0)
+    v_yy = dde.grad.jacobian(v_y, x, j=1)
 
     loss  = 1e-2 * (-(u_xx + u_yy) + p_x)**2
     loss += 1e-2 * (-(v_xx + v_yy) + p_y)**2
@@ -90,22 +84,18 @@ def output_transform(y, sol):
 net.apply_output_transform(output_transform)
 
 model = dde.Model(data, net)
-dde.optimizers.config.set_LBFGS_options(maxiter=1000)
+dde.optimizers.config.set_LBFGS_options(maxiter=5000)
 model.compile("L-BFGS")
 model.train()
 
 # Evaluate solution
 x = geo.uniform_points(100**dim)
-x = torch.tensor(x, requires_grad=True)
-sol = net(x)
+sol = net(torch.tensor(x))
 sol = sol.detach().numpy()
 u, v, p = sol[:, 0], sol[:, 1], sol[:, 2]
 
-# Plot in global coordinates
-x = to_global(x).detach().numpy()
-
 def plot(quantity, name, ax):
-    cb = ax.scatter(x[:, 0], x[:, 1], s=10, c=quantity)
+    cb = ax.scatter(x[:, 0], x[:, 1], s=2, c=quantity)
     plt.colorbar(cb)
     ax.set_title(name)
     ax.axis('equal')
@@ -117,14 +107,12 @@ plot(v, 'v', axs[1][0])
 plot(p, 'p', axs[0][1])
 
 # Plot quivers
-x = ref.uniform_points(10**dim)
-x = torch.tensor(x, requires_grad=True)
-sol = net(x)
+x = geo.uniform_points(16**dim)
+sol = net(torch.tensor(x))
 sol = sol.detach().numpy()
 u, v, p = sol[:, 0], sol[:, 1], sol[:, 2]
-x = to_global(x).detach().numpy()
 axq = axs[1][1]
-axq.quiver(x[:, 0], x[:, 1], u, v, pivot='mid')
+axq.quiver(x[:, 0], x[:, 1], u, v, scale=25)
 axq.axis('equal')
 axq.axis('off')
 
