@@ -1,6 +1,6 @@
 # TRAFO-PINN
 
-Physics-informed neural networks on transformed geometries.
+Physics-informed neural networks for transformed geometries and manifolds.
 
 
 ## Content
@@ -19,6 +19,6 @@ This repository contains the following examples:
 
 ![](https://github.com/samuelburbulla/trafo-pinn/blob/main/03_tube.png?raw=true)
 
-4. Shape optimization for Poisson equation
+4. Shape optimization with Laplace operator
 
 ![](https://github.com/samuelburbulla/trafo-pinn/blob/main/shape_plots/shape_18.png?raw=true)
