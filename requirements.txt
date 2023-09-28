@@ -1,2 +1,3 @@
 deepxde==1.9.3
 torch==2.0.1
+matplotlib==3.7.2
