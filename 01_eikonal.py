@@ -1,9 +1,9 @@
 import math
 import torch
-torch.manual_seed(0)
-
 import deepxde as dde
 import matplotlib.pyplot as plt
+
+torch.manual_seed(0)
 
 
 # Archimedean spiral
@@ -14,18 +14,26 @@ r = lambda x: a * x
 ref = dde.geometry.Interval(0, 1)
 dim = 2
 
+
 def to_global(x):
-    return torch.cat((
-        r(l * x) * torch.sin(l * x),
-        r(l * x) * torch.cos(l * x),
-    ), dim=1)
+    return torch.cat(
+        (
+            r(l * x) * torch.sin(l * x),
+            r(l * x) * torch.cos(l * x),
+        ),
+        dim=1,
+    )
+
 
 # Eikonal equation: grad(u) = 1
 def pde(x, u):
-    arc_length = torch.sqrt(sum(dde.grad.jacobian(to_global(x), x, i=i)**2 for i in range(dim)))
+    arc_length = torch.sqrt(
+        sum(dde.grad.jacobian(to_global(x), x, i=i) ** 2 for i in range(dim))
+    )
 
     grad = dde.grad.jacobian(u, x) / arc_length
-    return (grad - 1)**2
+    return (grad - 1) ** 2
+
 
 data = dde.data.PDE(ref, pde, [], num_domain=100)
 net = dde.nn.FNN([dim] + [128] * 3 + [1], "tanh", "Glorot uniform")
@@ -49,12 +57,14 @@ u = u.detach().numpy()
 y = to_global(x)
 plt.scatter(y[:, 0], y[:, 1], s=10, c=u)
 plt.colorbar()
-plt.axis('equal')
+plt.axis("equal")
 plt.savefig("01_eikonal.png")
 
 # Check that solution is correct
 umax = u.max()
-exact = a / 2 * (l * (1 + l**2)**.5 + math.log(l + (1 + l**2)**.5))
-print(f"u_max: {umax:.3f}  exact: {exact:.3f}"
-      f"  error: {abs(umax - exact)/umax*100:.2f}%\n")
+exact = a / 2 * (l * (1 + l**2) ** 0.5 + math.log(l + (1 + l**2) ** 0.5))
+print(
+    f"u_max: {umax:.3f}  exact: {exact:.3f}"
+    f"  error: {abs(umax - exact)/umax*100:.2f}%\n"
+)
 assert abs(umax - exact) < 1e-2

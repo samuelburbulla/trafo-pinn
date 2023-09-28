@@ -1,8 +1,8 @@
 import torch
-torch.manual_seed(0)
-
 import deepxde as dde
 import matplotlib.pyplot as plt
+
+torch.manual_seed(0)
 
 ref = dde.geometry.Rectangle([0, 0], [1, 1])
 dim = 3
@@ -10,21 +10,27 @@ dim = 3
 # Spherical coordinates
 psi0, theta0 = 0.5, 1.0
 
+
 def to_global(x):
     psi = x[:, 0:1] + psi0
     theta = x[:, 1:2] - theta0
-    return torch.cat((
-        torch.sin(psi) * torch.cos(theta),
-        torch.sin(psi) * torch.sin(theta),
-        torch.cos(psi),
-    ), dim=1)
+    return torch.cat(
+        (
+            torch.sin(psi) * torch.cos(theta),
+            torch.sin(psi) * torch.sin(theta),
+            torch.cos(psi),
+        ),
+        dim=1,
+    )
+
 
 # Poisson equation: -Lap(u) = 1
 def pde(x, u):
     lap = 0
     for i in range(ref.dim):
         lap += dde.grad.hessian(u, x, i=i, j=i)
-    return (-lap - 1)**2
+    return (-lap - 1) ** 2
+
 
 data = dde.data.PDE(ref, pde, [], num_domain=100)
 net = dde.nn.FNN([dim] + [128] * 3 + [1], "tanh", "Glorot uniform")
@@ -49,8 +55,8 @@ u = u.detach().numpy()
 # Plot in global coordinates
 y = to_global(x)
 fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
+ax = fig.add_subplot(111, projection="3d")
 cb = ax.scatter(y[:, 0], y[:, 1], y[:, 2], s=10, c=u)
 plt.colorbar(cb)
-plt.axis('equal')
+plt.axis("equal")
 plt.savefig("02_surface.png")
