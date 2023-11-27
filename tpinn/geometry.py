@@ -44,14 +44,14 @@ class Transformed(dde.geometry.Geometry):
 
     def to_local(self, y):
         """Transform points from global to local coordinates."""
-        tensor = bkd.is_tensor(x)
+        tensor = bkd.is_tensor(y)
         if not tensor:
             y = bkd.as_tensor(y)
 
         x = self.to_local_(y)
 
         if not tensor:
-            y = bkd.to_numpy(y)
+            x = bkd.to_numpy(x)
 
         return x
 
