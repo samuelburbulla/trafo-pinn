@@ -101,35 +101,45 @@ dde.optimizers.config.set_LBFGS_options(maxiter=5000)
 model.compile("L-BFGS")
 model.train()
 
-# Evaluate solution
-x = geo.uniform_points(100**dim)
-sol = net(torch.tensor(x))
-sol = sol.detach().numpy()
-u, v, p = sol[:, 0], sol[:, 1], sol[:, 2]
+# Evaluate and plot solution
+def plot_solution(coord_transform=lambda x: x, postfix=""):
+    y = geo.uniform_points(100**dim)
+    x = coord_transform(y)
+    sol = net(torch.tensor(y))
+    sol = sol.detach().numpy()
+    u, v, p = sol[:, 0], sol[:, 1], sol[:, 2]
 
 
-def plot(quantity, name, ax):
-    cb = ax.scatter(x[:, 0], x[:, 1], s=2, c=quantity)
-    plt.colorbar(cb)
-    ax.set_title(name)
-    ax.axis("equal")
-    ax.axis("off")
+    def plot(quantity, name, ax):
+        cb = ax.scatter(x[:, 0], x[:, 1], s=2, c=quantity)
+        plt.colorbar(cb)
+        ax.set_title(name)
+        ax.axis("equal")
+        ax.axis("off")
 
 
-fig, axs = plt.subplots(2, 2, figsize=(8, 8))
-plot(u, "u", axs[0][0])
-plot(v, "v", axs[1][0])
-plot(p, "p", axs[0][1])
+    _, axs = plt.subplots(2, 2, figsize=(8, 8))
+    plot(u, "u", axs[0][0])
+    plot(v, "v", axs[1][0])
+    plot(p, "p", axs[0][1])
 
-# Plot quivers
-x = geo.uniform_points(16**dim)
-sol = net(torch.tensor(x))
-sol = sol.detach().numpy()
-u, v, p = sol[:, 0], sol[:, 1], sol[:, 2]
-axq = axs[1][1]
-axq.quiver(x[:, 0], x[:, 1], u, v, scale=25)
-axq.axis("equal")
-axq.axis("off")
+    # Plot quivers
+    y = geo.uniform_points(16**dim)
+    x = coord_transform(y)
+    sol = net(torch.tensor(y))
+    sol = sol.detach().numpy()
+    u, v, p = sol[:, 0], sol[:, 1], sol[:, 2]
+    axq = axs[1][1]
+    axq.quiver(x[:, 0], x[:, 1], u, v, scale=25)
+    axq.axis("equal")
+    axq.axis("off")
 
-plt.tight_layout()
-plt.savefig("03_tube.png")
+    plt.tight_layout()
+    plt.savefig(f"03_tube{postfix}.png")
+
+
+# Plot solution in global coordinates
+plot_solution()
+
+# Plot solution in local coordinates
+plot_solution(geo.to_local, postfix="_local")
