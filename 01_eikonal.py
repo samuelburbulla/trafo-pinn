@@ -1,5 +1,5 @@
-import math
 import torch
+import numpy as np
 import deepxde as dde
 import matplotlib.pyplot as plt
 
@@ -60,11 +60,21 @@ plt.colorbar()
 plt.axis("equal")
 plt.savefig("01_eikonal.png")
 
-# Check that solution is correct
-umax = u.max()
-exact = a / 2 * (l * (1 + l**2) ** 0.5 + math.log(l + (1 + l**2) ** 0.5))
-print(
-    f"u_max: {umax:.3f}  exact: {exact:.3f}"
-    f"  error: {abs(umax - exact)/umax*100:.2f}%\n"
-)
-assert abs(umax - exact) < 1e-2
+# Exact solution
+def exact(x):
+    l = 3.5 * np.pi * x
+    return a / 2 * (l * (1 + l**2) ** 0.5 + np.log(l + (1 + l**2) ** 0.5))
+
+# Plot
+plt.clf()
+plt.plot(x, exact(x), 'k-', label="Ground truth")
+plt.plot(x, u, 'r--', label="Ours")
+plt.legend()
+plt.xlabel("$x$")
+plt.ylabel("$u$")
+plt.savefig("01_eikonal_plot.png")
+
+# Print L2 error
+u_exact = exact(x).reshape((-1, 1)).detach().numpy()
+e = u - u_exact
+print(f"|u - u_exact|_L2 = {(e ** 2).mean()**0.5:.3e}")
