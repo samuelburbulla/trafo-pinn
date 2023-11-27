@@ -24,15 +24,19 @@ def to_global(x):
     )
 
 
-# Poisson equation: -Lap(u) = 1
+# Poisson equation: -Lap(u) = 2 * pi**2 * sin(pi x) sin(pi y)
+pi = torch.pi
+u_exact = lambda x: torch.sin(pi * x[:, 0:1]) * torch.sin(pi * x[:, 1:2])
+source = lambda x: 2 * pi**2 * u_exact(x)
+
 def pde(x, u):
     lap = 0
     for i in range(ref.dim):
         lap += dde.grad.hessian(u, x, i=i, j=i)
-    return (-lap - 1) ** 2
+    return (-lap - source(x)) ** 2
 
 
-data = dde.data.PDE(ref, pde, [], num_domain=100)
+data = dde.data.PDE(ref, pde, [], num_domain=400)
 net = dde.nn.FNN([dim] + [128] * 3 + [1], "tanh", "Glorot uniform")
 net.apply_feature_transform(lambda x: to_global(x))
 
@@ -47,10 +51,12 @@ model.compile("L-BFGS")
 model.train()
 
 # Evaluate solution
-x = ref.uniform_points(100**dim)
+x = ref.uniform_points(100**ref.dim)
 x = torch.tensor(x)
 u = net(x)
+e = u - u_exact(x).reshape((-1, 1))
 u = u.detach().numpy()
+e = e.detach().numpy()
 
 # Plot in global coordinates
 y = to_global(x)
@@ -60,3 +66,16 @@ cb = ax.scatter(y[:, 0], y[:, 1], y[:, 2], s=10, c=u)
 plt.colorbar(cb)
 plt.axis("equal")
 plt.savefig("02_surface.png")
+
+# Plot error in local coordinates
+fig = plt.figure()
+ax = fig.add_subplot(111)
+cb = ax.scatter(x[:, 0], x[:, 1], s=10, c=e)
+plt.colorbar(cb, format='%.0e')
+plt.axis("equal")
+for w in ['top', 'bottom', 'right', 'left']:
+    ax.spines[w].set_visible(False)
+plt.savefig("02_surface_ref.png")
+
+# Print L2 error
+print(f"|u - u_exact|_L2 = {(e ** 2).mean()**0.5:.3e}")
