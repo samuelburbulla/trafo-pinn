@@ -1,6 +1,15 @@
+
+<p align="center">
+  <a href="https://arxiv.org/abs/2311.15940">
+    <img align="center" src="https://img.shields.io/badge/arXiv-2311.15940-b31b1b.svg?style=for-the-badge" alt="arXiv:2311.15940">
+  </a>
+</p>
+
 # TRAFO-PINN
 
-Physics-informed neural networks for transformed geometries and manifolds.
+Source code accompanying the paper:
+
+Samuel Burbulla. *Physics-informed neural networks for transformed geometries and manifolds.* arXiv preprint [arXiv:2311.15940](https://arxiv.org/abs/2311.15940), 2023.
 
 
 ## Content
